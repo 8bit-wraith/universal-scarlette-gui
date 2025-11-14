@@ -1,0 +1,47 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/scarlett-core",
+    "crates/scarlett-usb",
+    "crates/scarlett-hotkeys",
+    "crates/scarlett-config",
+    "crates/scarlett-gui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+license = "GPL-3.0-or-later"
+repository = "https://github.com/8bit-wraith/universal-scarlette-gui"
+
+[workspace.dependencies]
+# Core dependencies
+tokio = { version = "1.42", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# USB
+nusb = "0.1"
+
+# UI
+slint = "1.9"
+
+# Config
+ron = "0.8"
+toml = "0.8"
+directories = "5.0"
+
+# Platform-specific (defined in individual crates)
+core-foundation = "0.10"
+cocoa = "0.26"
+objc = "0.2"
+evdev = "0.12"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
