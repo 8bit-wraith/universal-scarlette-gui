@@ -5,6 +5,8 @@
 pub mod detection;
 pub mod protocol;
 pub mod device_impl;
+pub mod gen3_protocol;
+pub mod gen4_fcp;
 
 pub use detection::{DeviceDetector, HotplugEvent};
 pub use device_impl::UsbDevice;
