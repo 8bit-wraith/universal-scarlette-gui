@@ -10,6 +10,11 @@ use scarlett_usb::direct_usb_transport::DirectUsbTransport;
 use scarlett_usb::gen4_fcp::FcpProtocol;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Enable debug logging
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .init();
+
     println!("🔍 Scanning for Scarlett devices...\n");
 
     let device_list = nusb::list_devices()?;
@@ -83,7 +88,31 @@ fn test_gen4_fcp(device_info: &nusb::DeviceInfo) -> Result<(), Box<dyn std::erro
     println!("  → Sending INIT command...");
     // Try initialization
     match fcp.init() {
-        Ok(_) => println!("  ✅ INIT successful!"),
+        Ok(_) => {
+            println!("  ✅ INIT successful!");
+
+            // Try volume control!
+            println!("\n  → Testing volume control on output 0 (Monitor)...");
+
+            // Read current volume
+            match fcp.get_volume(0) {
+                Ok(vol) => println!("  📊 Current volume: {} dB", vol),
+                Err(e) => println!("  ⚠️  Failed to read volume: {}", e),
+            }
+
+            // Read mute status
+            match fcp.get_mute(0) {
+                Ok(muted) => println!("  🔇 Mute status: {}", if muted { "MUTED" } else { "UNMUTED" }),
+                Err(e) => println!("  ⚠️  Failed to read mute: {}", e),
+            }
+
+            // Optionally test volume change (commented out for safety)
+            // println!("\n  → Testing volume adjustment (+1 dB)...");
+            // match fcp.adjust_volume(0, 1) {
+            //     Ok(new_vol) => println!("  ✅ New volume: {} dB", new_vol),
+            //     Err(e) => println!("  ❌ Failed to adjust volume: {}", e),
+            // }
+        }
         Err(e) => println!("  ❌ INIT failed: {}", e),
     }
 

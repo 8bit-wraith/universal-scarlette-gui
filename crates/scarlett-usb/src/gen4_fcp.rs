@@ -526,11 +526,27 @@ impl FcpProtocol {
             self.interface_num as u16,  // index = interface number!
         );
 
-        let mut response = vec![0u8; response_size];
-        let actual = self.transport.control_in(&transfer_in, &mut response)?;
-        response.truncate(actual);
+        // Response includes 16-byte Scarlett2 header + data
+        const HEADER_SIZE: usize = 16;
+        let total_size = HEADER_SIZE + response_size;
+        let mut response_buf = vec![0u8; total_size];
+        let actual = self.transport.control_in(&transfer_in, &mut response_buf)?;
 
-        tracing::debug!("FCP response: {} bytes received", actual);
+        if actual < HEADER_SIZE {
+            return Err(Error::Protocol(format!(
+                "Response too short: got {} bytes, need at least {} for header",
+                actual, HEADER_SIZE
+            )));
+        }
+
+        tracing::debug!("FCP response: {} bytes total ({} header + {} data)",
+                       actual, HEADER_SIZE, actual - HEADER_SIZE);
+
+        // TODO: Validate header (cmd, seq, size, error, pad) like kernel driver does
+
+        // Extract just the data portion (skip 16-byte header)
+        let data_len = actual - HEADER_SIZE;
+        let response = response_buf[HEADER_SIZE..HEADER_SIZE + data_len].to_vec();
 
         Ok(response)
     }
@@ -622,6 +638,101 @@ impl FcpProtocol {
         self.send_command(FcpOpcode::DataWrite, &request, 0)?;
 
         Ok(())
+    }
+
+    /// Volume control constants
+    /// Based on mixer_scarlett2.c
+    pub const VOLUME_BIAS: i32 = 127;  // 0 dB = 127
+    pub const VOLUME_MIN: i32 = 0;     // -127 dB
+    pub const VOLUME_MAX: i32 = 127;   // 0 dB
+
+    /// Configuration offsets (from mixer_scarlett2.c)
+    const LINE_OUT_VOLUME_OFFSET: u32 = 0x34;
+    const MUTE_SWITCH_OFFSET: u32 = 0x5c;
+
+    /// Get volume for a specific output (0-based index)
+    /// Returns volume in dB (-127 to 0)
+    pub fn get_volume(&mut self, output_index: u8) -> Result<i32> {
+        if !self.initialized {
+            return Err(Error::Protocol("FCP not initialized".to_string()));
+        }
+
+        // Read 16-bit volume value from device
+        let offset = Self::LINE_OUT_VOLUME_OFFSET + (output_index as u32 * 2);
+        let raw_value = self.read_data(offset, 2)?;
+
+        // Convert from device value to dB
+        // Device stores: 0 = -127dB, 127 = 0dB
+        let db = raw_value - Self::VOLUME_BIAS;
+
+        tracing::debug!("Output {} volume: {} dB (raw={})", output_index, db, raw_value);
+        Ok(db)
+    }
+
+    /// Set volume for a specific output (0-based index)
+    /// volume_db: Volume in dB (-127 to 0)
+    pub fn set_volume(&mut self, output_index: u8, volume_db: i32) -> Result<()> {
+        if !self.initialized {
+            return Err(Error::Protocol("FCP not initialized".to_string()));
+        }
+
+        // Clamp to valid range
+        let volume_db = volume_db.clamp(-Self::VOLUME_BIAS, 0);
+
+        // Convert dB to device value
+        let device_value = volume_db + Self::VOLUME_BIAS;
+
+        tracing::info!("Setting output {} volume to {} dB (raw={})", output_index, volume_db, device_value);
+
+        // Write 16-bit volume value to device
+        let offset = Self::LINE_OUT_VOLUME_OFFSET + (output_index as u32 * 2);
+        self.write_data(offset, 2, device_value)?;
+
+        Ok(())
+    }
+
+    /// Adjust volume by delta (in dB)
+    pub fn adjust_volume(&mut self, output_index: u8, delta_db: i32) -> Result<i32> {
+        let current = self.get_volume(output_index)?;
+        let new_volume = (current + delta_db).clamp(-Self::VOLUME_BIAS, 0);
+        self.set_volume(output_index, new_volume)?;
+        Ok(new_volume)
+    }
+
+    /// Get mute status for a specific output
+    pub fn get_mute(&mut self, output_index: u8) -> Result<bool> {
+        if !self.initialized {
+            return Err(Error::Protocol("FCP not initialized".to_string()));
+        }
+
+        // Read 8-bit mute value from device
+        let offset = Self::MUTE_SWITCH_OFFSET + output_index as u32;
+        let muted = self.read_data(offset, 1)?;
+
+        Ok(muted != 0)
+    }
+
+    /// Set mute status for a specific output
+    pub fn set_mute(&mut self, output_index: u8, muted: bool) -> Result<()> {
+        if !self.initialized {
+            return Err(Error::Protocol("FCP not initialized".to_string()));
+        }
+
+        tracing::info!("Setting output {} mute: {}", output_index, muted);
+
+        // Write 8-bit mute value to device
+        let offset = Self::MUTE_SWITCH_OFFSET + output_index as u32;
+        self.write_data(offset, 1, if muted { 1 } else { 0 })?;
+
+        Ok(())
+    }
+
+    /// Toggle mute for a specific output
+    pub fn toggle_mute(&mut self, output_index: u8) -> Result<bool> {
+        let current = self.get_mute(output_index)?;
+        let new_state = !current;
+        self.set_mute(output_index, new_state)?;
+        Ok(new_state)
     }
 }
 
