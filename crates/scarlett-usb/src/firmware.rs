@@ -12,18 +12,19 @@ use std::path::Path;
 /// Magic string at the start of all Scarlett firmware files
 pub const FIRMWARE_MAGIC: &[u8; 8] = b"SCARLETT";
 
-/// Scarlett firmware file header (56 bytes, packed)
+/// Scarlett firmware file header (52 bytes, packed)
+/// All multi-byte integers are stored in BIG-ENDIAN format
 #[derive(Debug, Clone)]
 pub struct FirmwareHeader {
     /// Magic string "SCARLETT"
     pub magic: [u8; 8],
-    /// USB Vendor ID (0x1235 for Focusrite)
+    /// USB Vendor ID (0x1235 for Focusrite) - Big-endian
     pub usb_vid: u16,
-    /// USB Product ID (device-specific)
+    /// USB Product ID (device-specific) - Big-endian
     pub usb_pid: u16,
-    /// Firmware version number
+    /// Firmware version number - Big-endian
     pub firmware_version: u32,
-    /// Length of firmware data in bytes
+    /// Length of firmware data in bytes - Big-endian
     pub firmware_length: u32,
     /// SHA-256 hash of firmware data
     pub sha256: [u8; 32],
@@ -31,7 +32,7 @@ pub struct FirmwareHeader {
 
 impl FirmwareHeader {
     /// Size of the header in bytes
-    pub const SIZE: usize = 56;
+    pub const SIZE: usize = 52;
 
     /// Parse header from raw bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
@@ -201,7 +202,8 @@ mod tests {
 
     #[test]
     fn test_header_size() {
-        assert_eq!(FirmwareHeader::SIZE, 56);
+        // 8 (magic) + 2 (vid) + 2 (pid) + 4 (version) + 4 (length) + 32 (sha256) = 52
+        assert_eq!(FirmwareHeader::SIZE, 52);
     }
 
     #[test]
