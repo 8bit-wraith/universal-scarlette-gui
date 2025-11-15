@@ -4140,6 +4140,7 @@ dependencies = [
 name = "scarlett-usb"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "nusb",
  "scarlett-core",
  "serde",

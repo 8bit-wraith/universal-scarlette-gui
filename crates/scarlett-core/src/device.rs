@@ -92,33 +92,33 @@ impl DeviceModel {
     /// Get the USB Product ID for this device
     pub fn product_id(&self) -> u16 {
         match self {
-            // Gen 1 (PIDs from Linux kernel driver)
-            Self::Scarlett6i6Gen1 => 0x8203,
-            Self::Scarlett8i6Gen1 => 0x8204,
-            Self::Scarlett18i6Gen1 => 0x8201,
-            Self::Scarlett18i8Gen1 => 0x8202,
-            Self::Scarlett18i20Gen1 => 0x8200,
+            // Gen 1 - Original Scarlett devices (not in scarlett2 driver)
+            Self::Scarlett6i6Gen1 => 0x8200,  // Placeholder
+            Self::Scarlett8i6Gen1 => 0x8202,  // Placeholder
+            Self::Scarlett18i6Gen1 => 0x8205,  // Placeholder
+            Self::Scarlett18i8Gen1 => 0x8209,  // Placeholder
+            Self::Scarlett18i20Gen1 => 0x820D,  // Placeholder
 
-            // Gen 2
-            Self::Scarlett6i6Gen2 => 0x8211,
-            Self::Scarlett18i8Gen2 => 0x8210,
-            Self::Scarlett18i20Gen2 => 0x820C,
+            // Gen 2 - From scarlett2 driver
+            Self::Scarlett6i6Gen2 => 0x8203,
+            Self::Scarlett18i8Gen2 => 0x8204,
+            Self::Scarlett18i20Gen2 => 0x8201,
 
-            // Gen 3
-            Self::ScarlettSoloGen3 => 0x8215,
-            Self::Scarlett2i2Gen3 => 0x8214,
-            Self::Scarlett4i4Gen3 => 0x8213,
-            Self::Scarlett8i6Gen3 => 0x8212,
-            Self::Scarlett18i8Gen3 => 0x8217,
-            Self::Scarlett18i20Gen3 => 0x8218,
+            // Gen 3 - From scarlett2 driver
+            Self::ScarlettSoloGen3 => 0x8211,
+            Self::Scarlett2i2Gen3 => 0x8210,
+            Self::Scarlett4i4Gen3 => 0x8212,
+            Self::Scarlett8i6Gen3 => 0x8213,
+            Self::Scarlett18i8Gen3 => 0x8214,
+            Self::Scarlett18i20Gen3 => 0x8215,
 
-            // Gen 4
-            Self::ScarlettSoloGen4 => 0x8223,
-            Self::Scarlett2i2Gen4 => 0x8222,
-            Self::Scarlett4i4Gen4 => 0x8221,
-            Self::Scarlett16i16Gen4 => 0x8220,
-            Self::Scarlett18i16Gen4 => 0x821F,
-            Self::Scarlett18i20Gen4 => 0x821D,  // Confirmed from real hardware
+            // Gen 4 - From scarlett2 driver (small devices) and FCP driver (big devices)
+            Self::ScarlettSoloGen4 => 0x8218,
+            Self::Scarlett2i2Gen4 => 0x8219,
+            Self::Scarlett4i4Gen4 => 0x821A,
+            Self::Scarlett16i16Gen4 => 0x821B,  // FCP device (not in scarlett2 list)
+            Self::Scarlett18i16Gen4 => 0x821C,  // FCP device (not in scarlett2 list)
+            Self::Scarlett18i20Gen4 => 0x821D,  // FCP device - Confirmed from real hardware
 
             // Clarett USB
             Self::Clarett2PreUsb => 0x8206,
@@ -131,8 +131,8 @@ impl DeviceModel {
             Self::Clarett8PrePlus => 0x820C,
 
             // Vocaster
-            Self::VocasterOne => 0x8209,
-            Self::VocasterTwo => 0x8219,
+            Self::VocasterOne => 0x8216,
+            Self::VocasterTwo => 0x8217,
         }
     }
 
@@ -179,39 +179,47 @@ impl DeviceModel {
     /// Try to identify a device model from USB Product ID
     pub fn from_product_id(pid: u16) -> Option<Self> {
         match pid {
-            0x8200 => Some(Self::Scarlett18i20Gen1),
-            0x8201 => Some(Self::Scarlett18i6Gen1),
-            0x8202 => Some(Self::Scarlett18i8Gen1),
-            0x8203 => Some(Self::Scarlett6i6Gen1),
-            0x8204 => Some(Self::Scarlett8i6Gen1),
+            // Gen 1 (placeholders)
+            0x8200 => Some(Self::Scarlett6i6Gen1),
+            0x8202 => Some(Self::Scarlett8i6Gen1),
+            0x8205 => Some(Self::Scarlett18i6Gen1),
+            0x8209 => Some(Self::Scarlett18i8Gen1),
+            0x820D => Some(Self::Scarlett18i20Gen1),
 
-            0x820C => Some(Self::Scarlett18i20Gen2),
-            0x8210 => Some(Self::Scarlett18i8Gen2),
-            0x8211 => Some(Self::Scarlett6i6Gen2),
+            // Gen 2 - From scarlett2 driver list
+            0x8203 => Some(Self::Scarlett6i6Gen2),
+            0x8204 => Some(Self::Scarlett18i8Gen2),
+            0x8201 => Some(Self::Scarlett18i20Gen2),
 
-            0x8212 => Some(Self::Scarlett8i6Gen3),
-            0x8213 => Some(Self::Scarlett4i4Gen3),
-            0x8214 => Some(Self::Scarlett2i2Gen3),
-            0x8215 => Some(Self::ScarlettSoloGen3),
-            0x8217 => Some(Self::Scarlett18i8Gen3),
-            0x8218 => Some(Self::Scarlett18i20Gen3),
+            // Gen 3 - From scarlett2 driver list
+            0x8211 => Some(Self::ScarlettSoloGen3),
+            0x8210 => Some(Self::Scarlett2i2Gen3),
+            0x8212 => Some(Self::Scarlett4i4Gen3),
+            0x8213 => Some(Self::Scarlett8i6Gen3),
+            0x8214 => Some(Self::Scarlett18i8Gen3),
+            0x8215 => Some(Self::Scarlett18i20Gen3),
 
-            0x821D => Some(Self::Scarlett18i20Gen4),  // Confirmed from real hardware
-            0x821F => Some(Self::Scarlett18i16Gen4),
-            0x8220 => Some(Self::Scarlett16i16Gen4),
-            0x8221 => Some(Self::Scarlett4i4Gen4),
-            0x8222 => Some(Self::Scarlett2i2Gen4),
-            0x8223 => Some(Self::ScarlettSoloGen4),
+            // Gen 4 - From scarlett2 driver list (small) and FCP driver (big)
+            0x8218 => Some(Self::ScarlettSoloGen4),
+            0x8219 => Some(Self::Scarlett2i2Gen4),
+            0x821A => Some(Self::Scarlett4i4Gen4),
+            0x821B => Some(Self::Scarlett16i16Gen4),  // FCP device
+            0x821C => Some(Self::Scarlett18i16Gen4),  // FCP device
+            0x821D => Some(Self::Scarlett18i20Gen4),  // FCP device - Confirmed from real hardware
 
+            // Clarett USB
             0x8206 => Some(Self::Clarett2PreUsb),
             0x8207 => Some(Self::Clarett4PreUsb),
             0x8208 => Some(Self::Clarett8PreUsb),
 
+            // Clarett+
             0x820A => Some(Self::Clarett2PrePlus),
             0x820B => Some(Self::Clarett4PrePlus),
+            0x820C => Some(Self::Clarett8PrePlus),
 
-            0x8209 => Some(Self::VocasterOne),
-            0x8219 => Some(Self::VocasterTwo),
+            // Vocaster
+            0x8216 => Some(Self::VocasterOne),
+            0x8217 => Some(Self::VocasterTwo),
 
             _ => None,
         }

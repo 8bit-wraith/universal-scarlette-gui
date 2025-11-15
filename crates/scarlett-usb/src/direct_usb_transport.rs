@@ -4,23 +4,32 @@
 
 use crate::transport::{BulkTransfer, ControlTransfer, UsbTransport};
 use scarlett_core::{Error, Result};
-use nusb::Device;
+use nusb::{Device, Interface};
 use std::sync::Arc;
-use tracing::{debug, trace, warn};
+use tracing::{debug, trace};
 
 /// Direct USB transport implementation using nusb
 pub struct DirectUsbTransport {
     device: Arc<Device>,
+    interface: Interface,
     interface_number: u8,
 }
 
 impl DirectUsbTransport {
     /// Create a new direct USB transport
-    pub fn new(device: Device, interface_number: u8) -> Self {
-        Self {
+    pub fn new(device: Device, interface_number: u8) -> Result<Self> {
+        debug!("Claiming USB interface {}", interface_number);
+
+        // Claim the interface for exclusive access
+        let interface = device
+            .claim_interface(interface_number)
+            .map_err(|e| Error::Usb(format!("Failed to claim interface: {:?}", e)))?;
+
+        Ok(Self {
             device: Arc::new(device),
+            interface,
             interface_number,
-        }
+        })
     }
 
 }
@@ -36,12 +45,40 @@ impl UsbTransport for DirectUsbTransport {
             data.len()
         );
 
-        // TODO: Implement actual nusb 0.1.x control transfer
-        // The nusb 0.1.x API is different from what I initially implemented
-        // Need to study the nusb documentation and examples
+        // Parse request_type to determine control transfer parameters
+        let control_type = match (transfer.request_type >> 5) & 0x03 {
+            0 => nusb::transfer::ControlType::Standard,
+            1 => nusb::transfer::ControlType::Class,
+            2 => nusb::transfer::ControlType::Vendor,
+            _ => return Err(Error::Usb("Invalid control type".to_string())),
+        };
 
-        warn!("USB control OUT not yet implemented - returning success stub");
-        debug!("Would send {} bytes", data.len());
+        let recipient = match transfer.request_type & 0x1F {
+            0 => nusb::transfer::Recipient::Device,
+            1 => nusb::transfer::Recipient::Interface,
+            2 => nusb::transfer::Recipient::Endpoint,
+            3 => nusb::transfer::Recipient::Other,
+            _ => return Err(Error::Usb("Invalid recipient".to_string())),
+        };
+
+        // Perform the control transfer
+        let future = self.interface.control_out(nusb::transfer::ControlOut {
+            control_type,
+            recipient,
+            request: transfer.request,
+            value: transfer.value,
+            index: transfer.index,
+            data,
+        });
+
+        // Block on the async operation
+        let completion = futures::executor::block_on(future);
+
+        // Check status
+        completion.status
+            .map_err(|e| Error::Usb(format!("Control OUT failed: {:?}", e)))?;
+
+        trace!("Control OUT completed: {} bytes transferred", data.len());
         Ok(data.len())
     }
 
@@ -55,38 +92,61 @@ impl UsbTransport for DirectUsbTransport {
             buffer.len()
         );
 
-        // TODO: Implement actual nusb 0.1.x control transfer
-        // The nusb 0.1.x API is different from what I initially implemented
-        // Need to study the nusb documentation and examples
+        // Parse request_type to determine control transfer parameters
+        let control_type = match (transfer.request_type >> 5) & 0x03 {
+            0 => nusb::transfer::ControlType::Standard,
+            1 => nusb::transfer::ControlType::Class,
+            2 => nusb::transfer::ControlType::Vendor,
+            _ => return Err(Error::Usb("Invalid control type".to_string())),
+        };
 
-        warn!("USB control IN not yet implemented - returning empty stub");
-        Ok(0)
+        let recipient = match transfer.request_type & 0x1F {
+            0 => nusb::transfer::Recipient::Device,
+            1 => nusb::transfer::Recipient::Interface,
+            2 => nusb::transfer::Recipient::Endpoint,
+            3 => nusb::transfer::Recipient::Other,
+            _ => return Err(Error::Usb("Invalid recipient".to_string())),
+        };
+
+        // Perform the control transfer
+        let future = self.interface.control_in(nusb::transfer::ControlIn {
+            control_type,
+            recipient,
+            request: transfer.request,
+            value: transfer.value,
+            index: transfer.index,
+            length: buffer.len() as u16,
+        });
+
+        // Block on the async operation
+        let completion = futures::executor::block_on(future);
+
+        // Check status
+        completion.status
+            .map_err(|e| Error::Usb(format!("Control IN failed: {:?}", e)))?;
+
+        // Copy data to buffer
+        let actual_len = completion.data.len().min(buffer.len());
+        buffer[..actual_len].copy_from_slice(&completion.data[..actual_len]);
+
+        trace!("Control IN completed: {} bytes received", actual_len);
+        Ok(actual_len)
     }
 
-    fn bulk_out(&self, transfer: &BulkTransfer, data: &[u8]) -> Result<usize> {
-        trace!(
-            "USB bulk OUT: ep=0x{:02x}, len={}",
-            transfer.endpoint,
-            data.len()
-        );
-
-        // TODO: Implement actual nusb 0.1.x bulk transfer
-
-        warn!("USB bulk OUT not yet implemented - returning success stub");
-        Ok(data.len())
+    fn bulk_out(&self, _transfer: &BulkTransfer, _data: &[u8]) -> Result<usize> {
+        // TODO: Implement bulk transfers if needed
+        // Most Scarlett devices use control transfers for communication
+        // This is here for completeness and future expansion
+        trace!("Bulk OUT not yet implemented");
+        Err(Error::NotSupported("Bulk transfers not yet implemented".to_string()))
     }
 
-    fn bulk_in(&self, transfer: &BulkTransfer, buffer: &mut [u8]) -> Result<usize> {
-        trace!(
-            "USB bulk IN: ep=0x{:02x}, len={}",
-            transfer.endpoint,
-            buffer.len()
-        );
-
-        // TODO: Implement actual nusb 0.1.x bulk transfer
-
-        warn!("USB bulk IN not yet implemented - returning empty stub");
-        Ok(0)
+    fn bulk_in(&self, _transfer: &BulkTransfer, _buffer: &mut [u8]) -> Result<usize> {
+        // TODO: Implement bulk transfers if needed
+        // Most Scarlett devices use control transfers for communication
+        // This is here for completeness and future expansion
+        trace!("Bulk IN not yet implemented");
+        Err(Error::NotSupported("Bulk transfers not yet implemented".to_string()))
     }
 
     fn is_connected(&self) -> bool {
@@ -126,7 +186,7 @@ impl DirectUsbTransportBuilder {
             self.interface_number
         );
 
-        Ok(DirectUsbTransport::new(device, self.interface_number))
+        DirectUsbTransport::new(device, self.interface_number)
     }
 }
 
