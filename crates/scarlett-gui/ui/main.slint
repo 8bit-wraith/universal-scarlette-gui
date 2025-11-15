@@ -2,21 +2,27 @@
 
 import { Button, VerticalBox, HorizontalBox, ListView, ScrollView } from "std-widgets.slint";
 
-// Color palette matching Focusrite branding
+// Color palette matching Focusrite branding - Extra Dark Theme
 export global ColorPalette {
     // Focusrite Red
     in-out property <color> primary: #E2231A;
-    in-out property <color> primary-hover: #FF2B1F;
+    in-out property <color> primary-hover: #FF3B2F;
+    in-out property <color> primary-dim: #B01812;
 
-    // Dark theme colors
-    in-out property <color> background: #2B2B2B;
-    in-out property <color> surface: #3C3C3C;
-    in-out property <color> surface-light: #4A4A4A;
+    // Extra dark theme colors (professional audio app style)
+    in-out property <color> background: #0D0D0D;
+    in-out property <color> surface: #1A1A1A;
+    in-out property <color> surface-light: #252525;
+    in-out property <color> surface-lighter: #303030;
 
-    // Text colors
-    in-out property <color> text-primary: #FFFFFF;
-    in-out property <color> text-secondary: #B0B0B0;
-    in-out property <color> text-disabled: #707070;
+    // Text colors with better contrast
+    in-out property <color> text-primary: #EEEEEE;
+    in-out property <color> text-secondary: #999999;
+    in-out property <color> text-disabled: #555555;
+
+    // Accent colors
+    in-out property <color> border: #333333;
+    in-out property <color> success: #4CAF50;
 }
 
 // Device info struct
@@ -85,12 +91,26 @@ export component MainWindow inherits Window {
                 height: 200px;
                 background: ColorPalette.surface;
                 border-radius: 8px;
+                border-width: 1px;
+                border-color: ColorPalette.border;
 
-                if devices.length == 0: Text {
-                    text: status-text;
-                    color: ColorPalette.text-secondary;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
+                if devices.length == 0: VerticalBox {
+                    alignment: center;
+                    spacing: 8px;
+
+                    Text {
+                        text: status-text;
+                        font-size: 14px;
+                        color: ColorPalette.text-secondary;
+                        horizontal-alignment: center;
+                    }
+
+                    Text {
+                        text: "Click 'Scan for Devices' or connect a Focusrite device";
+                        font-size: 11px;
+                        color: ColorPalette.text-disabled;
+                        horizontal-alignment: center;
+                    }
                 }
 
                 if devices.length > 0: ScrollView {
@@ -170,14 +190,25 @@ export component MainWindow inherits Window {
             height: 30px;
             background: ColorPalette.surface;
             border-radius: 4px;
+            border-width: 1px;
+            border-color: ColorPalette.border;
 
             HorizontalBox {
                 padding: 8px;
+                spacing: 12px;
 
                 Text {
-                    text: "Ready";
-                    font-size: 12px;
-                    color: ColorPalette.text-secondary;
+                    text: devices.length == 0 ? "● No devices connected" : "● " + devices.length + " device(s) connected";
+                    font-size: 11px;
+                    color: devices.length > 0 ? ColorPalette.success : ColorPalette.text-disabled;
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                Text {
+                    text: "Rust + Slint UI";
+                    font-size: 10px;
+                    color: ColorPalette.text-disabled;
                 }
             }
         }

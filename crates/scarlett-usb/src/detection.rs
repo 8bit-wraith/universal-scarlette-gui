@@ -27,17 +27,34 @@ impl DeviceDetector {
 
     /// Scan for connected Scarlett devices
     pub fn scan_devices(&self) -> Result<Vec<DeviceInfo>> {
-        info!("Scanning for Focusrite Scarlett devices...");
+        info!("🔍 Scanning for Focusrite Scarlett devices...");
         let mut devices = Vec::new();
 
         let device_list = nusb::list_devices()
             .map_err(|e| Error::Usb(format!("Failed to list USB devices: {}", e)))?;
 
+        let mut total_devices = 0;
+        let mut focusrite_count = 0;
         for device_info in device_list {
+            total_devices += 1;
+            // Log all USB devices in debug mode
+            debug!(
+                "USB Device: VID=0x{:04x}, PID=0x{:04x}",
+                device_info.vendor_id(),
+                device_info.product_id()
+            );
+
             if device_info.vendor_id() == FOCUSRITE_VENDOR_ID {
+                focusrite_count += 1;
+                info!(
+                    "🎵 Found Focusrite device: VID=0x{:04x}, PID=0x{:04x}",
+                    device_info.vendor_id(),
+                    device_info.product_id()
+                );
+
                 if let Some(model) = DeviceModel::from_product_id(device_info.product_id()) {
-                    debug!(
-                        "Found device: {} (VID: 0x{:04x}, PID: 0x{:04x})",
+                    info!(
+                        "✅ Recognized device: {} (VID: 0x{:04x}, PID: 0x{:04x})",
                         model.name(),
                         device_info.vendor_id(),
                         device_info.product_id()
@@ -56,18 +73,29 @@ impl DeviceDetector {
                         device_info.device_address()
                     );
 
+                    info!("   Serial: {}, Path: {}", serial, usb_path);
+
                     let device = DeviceInfo::new(model, serial, usb_path);
                     devices.push(device);
                 } else {
-                    debug!(
-                        "Found unsupported Focusrite device (PID: 0x{:04x})",
+                    warn!(
+                        "❌ Unsupported Focusrite device (PID: 0x{:04x}) - please report this!",
                         device_info.product_id()
                     );
                 }
             }
         }
 
-        info!("Found {} Scarlett device(s)", devices.len());
+        info!("📋 Scanned {} total USB devices", total_devices);
+
+        if focusrite_count == 0 {
+            info!("💡 No Focusrite devices found. Make sure your device is connected and powered on.");
+            info!("   Looking for Vendor ID: 0x{:04x} (Focusrite)", FOCUSRITE_VENDOR_ID);
+        } else {
+            info!("🎵 Found {} Focusrite device(s)", focusrite_count);
+        }
+
+        info!("✨ Scan complete: {} Scarlett device(s) ready", devices.len());
         Ok(devices)
     }
 
