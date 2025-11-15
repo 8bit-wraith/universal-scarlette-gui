@@ -421,14 +421,23 @@ impl FcpOpcode {
 pub struct FcpProtocol {
     transport: Box<dyn crate::transport::UsbTransport>,
     initialized: bool,
+    seq_num: u16,  // Sequence number for Scarlett2 USB packets
+    interface_num: u8,  // Interface number for control transfers
 }
 
 impl FcpProtocol {
     /// Create a new FCP protocol handler
     pub fn new(transport: Box<dyn crate::transport::UsbTransport>) -> Self {
+        Self::new_with_interface(transport, 0)
+    }
+
+    /// Create a new FCP protocol handler with specific interface number
+    pub fn new_with_interface(transport: Box<dyn crate::transport::UsbTransport>, interface_num: u8) -> Self {
         Self {
             transport,
             initialized: false,
+            seq_num: 0,  // Start at 0, will increment on first use
+            interface_num,
         }
     }
 
@@ -463,18 +472,32 @@ impl FcpProtocol {
     ///
     /// Based on Linux kernel mixer_scarlett2.c driver (scarlett2_usb_tx/rx functions).
     /// Uses class-specific control transfers, not vendor-specific.
-    fn send_command(&self, opcode: FcpOpcode, request_data: &[u8], response_size: usize) -> Result<Vec<u8>> {
+    fn send_command(&mut self, opcode: FcpOpcode, request_data: &[u8], response_size: usize) -> Result<Vec<u8>> {
         use crate::transport::ControlTransfer;
 
-        tracing::trace!("FCP command: {:?}, req_len={}, resp_len={}", opcode, request_data.len(), response_size);
+        // Increment sequence number (kernel starts at 1 for init)
+        self.seq_num += 1;
 
-        // Build request packet: opcode (u16 LE) + length (u16 LE) + data
+        tracing::trace!("FCP command: {:?}, seq={}, req_len={}, resp_len={}", opcode, self.seq_num, request_data.len(), response_size);
+
+        // Build Scarlett2 USB packet matching mixer_scarlett2.c
+        // struct scarlett2_usb_packet:
+        //   __le32 cmd;
+        //   __le16 size;
+        //   __le16 seq;
+        //   __le32 error;
+        //   __le32 pad;
+        //   u8 data[];
+
         let mut request = Vec::new();
-        request.extend_from_slice(&(opcode as u16).to_le_bytes());
-        request.extend_from_slice(&(request_data.len() as u16).to_le_bytes());
-        request.extend_from_slice(request_data);
+        request.extend_from_slice(&(opcode as u32).to_le_bytes());  // cmd (4 bytes)
+        request.extend_from_slice(&(request_data.len() as u16).to_le_bytes());  // size (2 bytes)
+        request.extend_from_slice(&(self.seq_num).to_le_bytes());  // seq (2 bytes)
+        request.extend_from_slice(&0u32.to_le_bytes());  // error (4 bytes)
+        request.extend_from_slice(&0u32.to_le_bytes());  // pad (4 bytes)
+        request.extend_from_slice(request_data);  // data
 
-        tracing::debug!("FCP request packet: {} bytes total", request.len());
+        tracing::debug!("Scarlett2 USB packet: {} bytes total (16 byte header + {} data), seq={}", request.len(), request_data.len(), self.seq_num);
 
         // Send command via class-specific control transfer
         // From mixer_scarlett2.c:scarlett2_usb_tx()
@@ -483,7 +506,7 @@ impl FcpProtocol {
         let transfer_out = ControlTransfer::class_out(
             2,  // SCARLETT2_USB_CMD_REQ
             0,  // value
-            0,  // index (interface number, typically 0 for audio control)
+            self.interface_num as u16,  // index = interface number!
         );
 
         self.transport.control_out(&transfer_out, &request)?;
@@ -500,7 +523,7 @@ impl FcpProtocol {
         let transfer_in = ControlTransfer::class_in(
             3,  // SCARLETT2_USB_CMD_RESP
             0,  // value
-            0,  // index
+            self.interface_num as u16,  // index = interface number!
         );
 
         let mut response = vec![0u8; response_size];
@@ -513,7 +536,7 @@ impl FcpProtocol {
     }
 
     /// Read meter levels
-    pub fn read_meters(&self, count: u16) -> Result<Vec<u32>> {
+    pub fn read_meters(&mut self, count: u16) -> Result<Vec<u32>> {
         if !self.initialized {
             return Err(Error::Protocol("FCP not initialized".to_string()));
         }
@@ -537,7 +560,7 @@ impl FcpProtocol {
     }
 
     /// Read mixer info (number of outputs and inputs)
-    pub fn read_mix_info(&self) -> Result<(u8, u8)> {
+    pub fn read_mix_info(&mut self) -> Result<(u8, u8)> {
         if !self.initialized {
             return Err(Error::Protocol("FCP not initialized".to_string()));
         }
@@ -552,7 +575,7 @@ impl FcpProtocol {
     }
 
     /// Read data value (1, 2, or 4 bytes)
-    pub fn read_data(&self, offset: u32, size: u32) -> Result<i32> {
+    pub fn read_data(&mut self, offset: u32, size: u32) -> Result<i32> {
         if !self.initialized {
             return Err(Error::Protocol("FCP not initialized".to_string()));
         }
@@ -579,7 +602,7 @@ impl FcpProtocol {
     }
 
     /// Write data value (1, 2, or 4 bytes)
-    pub fn write_data(&self, offset: u32, size: u32, value: i32) -> Result<()> {
+    pub fn write_data(&mut self, offset: u32, size: u32, value: i32) -> Result<()> {
         if !self.initialized {
             return Err(Error::Protocol("FCP not initialized".to_string()));
         }

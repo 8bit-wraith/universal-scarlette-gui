@@ -32,6 +32,42 @@ impl DirectUsbTransport {
         })
     }
 
+    /// Find and create transport for vendor-specific interface (class 255)
+    /// This is the Focusrite Control interface used for mixer/routing commands
+    pub fn new_vendor_interface(device: Device) -> Result<Self> {
+        debug!("Searching for vendor-specific interface (class 255)");
+
+        // Get active configuration
+        let config = device.active_configuration()
+            .map_err(|e| Error::Usb(format!("Failed to get configuration: {:?}", e)))?;
+
+        // Look for vendor-specific interface (class 255)
+        let mut vendor_interface_num = None;
+        for interface_info in config.interfaces() {
+            for alt_setting in interface_info.alt_settings() {
+                if alt_setting.class() == 255 {  // Vendor-specific class
+                    vendor_interface_num = Some(interface_info.interface_number());
+                    break;
+                }
+            }
+            if vendor_interface_num.is_some() {
+                break;
+            }
+        }
+
+        if let Some(interface_num) = vendor_interface_num {
+            debug!("Found vendor-specific interface: {}", interface_num);
+            Self::new(device, interface_num)
+        } else {
+            Err(Error::Usb("No vendor-specific interface found (class 255)".to_string()))
+        }
+    }
+
+    /// Get the interface number this transport is using
+    pub fn interface_number(&self) -> u8 {
+        self.interface_number
+    }
+
 }
 
 impl UsbTransport for DirectUsbTransport {
