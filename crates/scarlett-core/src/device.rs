@@ -118,7 +118,7 @@ impl DeviceModel {
             Self::Scarlett4i4Gen4 => 0x8221,
             Self::Scarlett16i16Gen4 => 0x8220,
             Self::Scarlett18i16Gen4 => 0x821F,
-            Self::Scarlett18i20Gen4 => 0x821E,
+            Self::Scarlett18i20Gen4 => 0x821D,  // Confirmed from real hardware
 
             // Clarett USB
             Self::Clarett2PreUsb => 0x8206,
@@ -196,7 +196,7 @@ impl DeviceModel {
             0x8217 => Some(Self::Scarlett18i8Gen3),
             0x8218 => Some(Self::Scarlett18i20Gen3),
 
-            0x821E => Some(Self::Scarlett18i20Gen4),
+            0x821D => Some(Self::Scarlett18i20Gen4),  // Confirmed from real hardware
             0x821F => Some(Self::Scarlett18i16Gen4),
             0x8220 => Some(Self::Scarlett16i16Gen4),
             0x8221 => Some(Self::Scarlett4i4Gen4),
