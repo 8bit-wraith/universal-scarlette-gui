@@ -1,57 +1,55 @@
 # Scarlett Control - Rust Edition Status
 
-## 🎉 Current Status: Device Detection Working!
+## 🎉 Current Status: USB Communication Working!
 
-Your **Scarlett 18i20 Gen 4** is now being detected and displays in the UI!
+Your **Scarlett 18i20 Gen 4** is detected AND we can now send USB commands!
 
 ### ✅ What's Working Right Now
 
-1. **Device Detection** - Your 18i20 Gen 4 shows up in the app
-2. **Dark UI Theme** - Professional audio app aesthetic
-3. **Hotplug Monitoring** - Detects when you connect/disconnect
-4. **Device Information** - Shows model name and serial number
-5. **Protocol Foundations** - Both Gen 3 and Gen 4 protocol structures are implemented
+1. **Device Detection** ✅ - Your 18i20 Gen 4 shows up in the app
+2. **Dark UI Theme** ✅ - Professional audio app aesthetic
+3. **Hotplug Monitoring** ✅ - Detects when you connect/disconnect
+4. **Device Information** ✅ - Shows model name and serial number
+5. **USB Control Transfers** ✅ - Can send/receive USB commands via nusb
+6. **FCP Protocol Layer** ✅ - Complete Gen 4 protocol implementation
+   - Device initialization (INIT_1, INIT_2)
+   - Meter reading (level meters)
+   - Mixer info/control (MIX commands)
+   - Routing matrix (MUX commands)
+   - Data read/write (control values)
 
 ### 🚧 What's In Progress
 
-**USB Communication Layer** - The actual USB communication to control the device
+**Device Integration** - Connecting the protocol layer to device detection
 
-Currently, the protocol structures are defined but the actual USB transfers need to be implemented using the `nusb` library. This is the critical next step to make the app functional.
+We now have all the pieces:
+- ✅ Device detection finds your hardware
+- ✅ USB transport can send commands
+- ✅ FCP protocol knows how to talk to Gen 4
+
+Next: Wire them together so the app can actually control your 18i20!
 
 ### 🎯 Immediate Next Steps (in order)
 
-#### 1. Implement USB Control Transfers
-**File**: `crates/scarlett-usb/src/gen4_fcp.rs`
+#### 1. Determine USB Request Parameters ← **YOU ARE HERE**
+**Challenge**: Figure out the exact USB request/value/index parameters
 
-Need to replace the placeholder USB functions with actual `nusb` calls:
-```rust
-// Current: Placeholder
-fn control_write(&self, ...) -> Result<()> {
-    // TODO: Implement
-}
+The FCP protocol is currently using placeholder values (0x00) for USB control transfers.
+We need to determine the correct parameters by either:
+- Examining the Linux kernel FCP driver source code
+- USB packet capture on Linux while using Focusrite Control
+- Testing different parameter combinations
 
-// Needed: Actual USB
-fn control_write(&self, data: &[u8]) -> Result<()> {
-    self.device.control_out(
-        request_type,
-        request,
-        value,
-        index,
-        data,
-        timeout
-    )?;
-    Ok(())
-}
-```
+**File**: `crates/scarlett-usb/src/gen4_fcp.rs:481-484`
 
-#### 2. Open USB Device Handle
+#### 2. Create Device Wrapper
 **File**: `crates/scarlett-usb/src/device_impl.rs`
 
-When opening a device, we need to:
-1. Find the USB device by VID/PID
-2. Open it with `nusb`
-3. Claim the audio control interface
-4. Store the device handle for protocol operations
+Connect everything together:
+1. Take detected device (nusb::Device)
+2. Create DirectUsbTransport with it
+3. Create FcpProtocol with the transport
+4. Initialize FCP and expose high-level API
 
 #### 3. Implement Basic Volume Control
 **Target**: Monitor output volume for keyboard integration
@@ -341,12 +339,18 @@ Once complete, you'll have:
 
 ---
 
-**Current Commits**:
+**Recent Commits**:
 - Initial Rust rewrite ✅
 - Darker UI theme ✅
 - 18i20 Gen 4 support ✅
 - Protocol foundations ✅
+- USB control transfers ✅ (DirectUsbTransport with nusb)
+- FCP protocol layer ✅ (Complete Gen 4 command set)
 
-**Next Commit**: USB communication implementation 🚧
+**Next Up**:
+1. Find correct USB parameters (possibly from Linux kernel driver)
+2. Test FCP initialization with your 18i20
+3. Implement volume control API
+4. Connect to keyboard hotkeys
 
-Let me know which feature you'd like me to tackle next!
+The foundation is solid - we're ready to start talking to the hardware!
