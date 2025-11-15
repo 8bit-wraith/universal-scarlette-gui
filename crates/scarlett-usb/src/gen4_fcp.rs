@@ -459,11 +459,10 @@ impl FcpProtocol {
         Ok((step0_resp, step2_resp))
     }
 
-    /// Send an FCP command via USB vendor control transfer
+    /// Send an FCP command via USB class-specific control transfer
     ///
-    /// On Linux, this goes through hwdep ioctl, but on macOS we use direct USB.
-    /// Based on Scarlett2 protocol pattern (Gen 3), using vendor-specific control transfers.
-    /// These parameters may need adjustment based on actual hardware testing.
+    /// Based on Linux kernel mixer_scarlett2.c driver (scarlett2_usb_tx/rx functions).
+    /// Uses class-specific control transfers, not vendor-specific.
     fn send_command(&self, opcode: FcpOpcode, request_data: &[u8], response_size: usize) -> Result<Vec<u8>> {
         use crate::transport::ControlTransfer;
 
@@ -477,15 +476,14 @@ impl FcpProtocol {
 
         tracing::debug!("FCP request packet: {} bytes total", request.len());
 
-        // Send command via vendor-specific control transfer
-        // Based on Gen 3 Scarlett2 protocol pattern:
-        // - Request type 0x40 = vendor-specific, host-to-device
-        // - Request 0x00 seems to be standard for Scarlett devices
-        // - Value/Index typically 0x00
-        let transfer_out = ControlTransfer::vendor_out(
-            0x00,  // request (standard for Scarlett vendor commands)
-            0x00,  // value
-            0x00,  // index (interface number)
+        // Send command via class-specific control transfer
+        // From mixer_scarlett2.c:scarlett2_usb_tx()
+        // USB_TYPE_CLASS | USB_RECIP_INTERFACE | USB_DIR_OUT = 0x21
+        // Request = SCARLETT2_USB_CMD_REQ = 2
+        let transfer_out = ControlTransfer::class_out(
+            2,  // SCARLETT2_USB_CMD_REQ
+            0,  // value
+            0,  // index (interface number, typically 0 for audio control)
         );
 
         self.transport.control_out(&transfer_out, &request)?;
@@ -495,12 +493,14 @@ impl FcpProtocol {
             return Ok(Vec::new());
         }
 
-        // Read response via vendor-specific IN transfer
-        // Request type 0xC0 = vendor-specific, device-to-host
-        let transfer_in = ControlTransfer::vendor_in(
-            0x00,  // request (may need to be different, will test)
-            0x00,  // value
-            0x00,  // index
+        // Read response via class-specific IN transfer
+        // From mixer_scarlett2.c:scarlett2_usb_rx()
+        // USB_TYPE_CLASS | USB_RECIP_INTERFACE | USB_DIR_IN = 0xA1
+        // Request = SCARLETT2_USB_CMD_RESP = 3
+        let transfer_in = ControlTransfer::class_in(
+            3,  // SCARLETT2_USB_CMD_RESP
+            0,  // value
+            0,  // index
         );
 
         let mut response = vec![0u8; response_size];
