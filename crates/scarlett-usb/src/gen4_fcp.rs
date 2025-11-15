@@ -462,33 +462,43 @@ impl FcpProtocol {
     /// Send an FCP command via USB vendor control transfer
     ///
     /// On Linux, this goes through hwdep ioctl, but on macOS we use direct USB.
-    /// The exact USB parameters (request, value, index) need to be determined
-    /// by examining the Linux kernel driver or USB packet captures.
+    /// Based on Scarlett2 protocol pattern (Gen 3), using vendor-specific control transfers.
+    /// These parameters may need adjustment based on actual hardware testing.
     fn send_command(&self, opcode: FcpOpcode, request_data: &[u8], response_size: usize) -> Result<Vec<u8>> {
-        use crate::transport::{ControlTransfer, Direction};
+        use crate::transport::ControlTransfer;
 
         tracing::trace!("FCP command: {:?}, req_len={}, resp_len={}", opcode, request_data.len(), response_size);
 
-        // Build request packet
+        // Build request packet: opcode (u16 LE) + length (u16 LE) + data
         let mut request = Vec::new();
         request.extend_from_slice(&(opcode as u16).to_le_bytes());
         request.extend_from_slice(&(request_data.len() as u16).to_le_bytes());
         request.extend_from_slice(request_data);
 
+        tracing::debug!("FCP request packet: {} bytes total", request.len());
+
         // Send command via vendor-specific control transfer
-        // TODO: Determine exact USB request parameters from kernel driver
-        // For now, using placeholders similar to Scarlett2 protocol
+        // Based on Gen 3 Scarlett2 protocol pattern:
+        // - Request type 0x40 = vendor-specific, host-to-device
+        // - Request 0x00 seems to be standard for Scarlett devices
+        // - Value/Index typically 0x00
         let transfer_out = ControlTransfer::vendor_out(
-            0x00,  // request - TBD from kernel driver
+            0x00,  // request (standard for Scarlett vendor commands)
             0x00,  // value
             0x00,  // index (interface number)
         );
 
         self.transport.control_out(&transfer_out, &request)?;
 
-        // Read response
+        // Only read response if we expect one
+        if response_size == 0 {
+            return Ok(Vec::new());
+        }
+
+        // Read response via vendor-specific IN transfer
+        // Request type 0xC0 = vendor-specific, device-to-host
         let transfer_in = ControlTransfer::vendor_in(
-            0x01,  // request - TBD from kernel driver
+            0x00,  // request (may need to be different, will test)
             0x00,  // value
             0x00,  // index
         );
@@ -496,6 +506,8 @@ impl FcpProtocol {
         let mut response = vec![0u8; response_size];
         let actual = self.transport.control_in(&transfer_in, &mut response)?;
         response.truncate(actual);
+
+        tracing::debug!("FCP response: {} bytes received", actual);
 
         Ok(response)
     }
