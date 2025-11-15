@@ -17,6 +17,12 @@ Your **Scarlett 18i20 Gen 4** is detected AND we can now send USB commands!
    - Mixer info/control (MIX commands)
    - Routing matrix (MUX commands)
    - Data read/write (control values)
+   - **Correct USB parameters** from Linux kernel driver (CLASS-specific, not vendor)
+7. **Firmware File Parser** ✅ - Safe firmware file validation
+   - Parse firmware headers with VID/PID/version
+   - SHA-256 hash verification
+   - Device compatibility checking
+   - Ready for firmware update implementation
 
 ### 🚧 What's In Progress
 
@@ -31,18 +37,18 @@ Next: Wire them together so the app can actually control your 18i20!
 
 ### 🎯 Immediate Next Steps (in order)
 
-#### 1. Determine USB Request Parameters ← **YOU ARE HERE**
-**Challenge**: Figure out the exact USB request/value/index parameters
+#### 1. ~~Determine USB Request Parameters~~ ✅ **COMPLETE**
+**Found the answer in Linux kernel driver!**
 
-The FCP protocol is currently using placeholder values (0x00) for USB control transfers.
-We need to determine the correct parameters by either:
-- Examining the Linux kernel FCP driver source code
-- USB packet capture on Linux while using Focusrite Control
-- Testing different parameter combinations
+The mixer_scarlett2.c driver revealed:
+- CLASS-specific requests (not vendor-specific)
+- Request 2 (CMD_REQ) for sending commands
+- Request 3 (CMD_RESP) for receiving responses
+- Interface 0, no value parameter needed
 
-**File**: `crates/scarlett-usb/src/gen4_fcp.rs:481-484`
+**File**: `crates/scarlett-usb/src/gen4_fcp.rs:483-504`
 
-#### 2. Create Device Wrapper
+#### 2. Create Device Wrapper ← **YOU ARE HERE**
 **File**: `crates/scarlett-usb/src/device_impl.rs`
 
 Connect everything together:
@@ -212,7 +218,8 @@ User preferences (in `scarlett-config`):
 
 ### Phase 3: Advanced Features
 - [ ] Level meters with peak hold
-- [ ] Firmware updates
+- [x] Firmware file parser (validation/parsing complete)
+- [ ] Firmware flash implementation (upload to device)
 - [ ] Multiple device support
 - [ ] Presets/scenes
 
@@ -346,11 +353,14 @@ Once complete, you'll have:
 - Protocol foundations ✅
 - USB control transfers ✅ (DirectUsbTransport with nusb)
 - FCP protocol layer ✅ (Complete Gen 4 command set)
+- **USB parameters fixed** ✅ (Found in mixer_scarlett2.c kernel driver!)
+- **Firmware parser** ✅ (SHA-256 validation, VID/PID matching)
 
 **Next Up**:
-1. Find correct USB parameters (possibly from Linux kernel driver)
+1. Wire device wrapper to connect detection → transport → FCP
 2. Test FCP initialization with your 18i20
 3. Implement volume control API
 4. Connect to keyboard hotkeys
+5. (Optional) Implement firmware flash for safe updates
 
-The foundation is solid - we're ready to start talking to the hardware!
+The foundation is solid - all the pieces are ready to wire together!
