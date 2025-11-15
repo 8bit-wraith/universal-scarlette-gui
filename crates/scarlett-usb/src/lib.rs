@@ -10,12 +10,14 @@ pub mod gen3_protocol;
 pub mod gen4_fcp;
 pub mod transport;
 pub mod direct_usb_transport;
+pub mod firmware;
 
 pub use detection::{DeviceDetector, HotplugEvent};
 pub use device_impl::UsbDevice;
 pub use transport::{UsbTransport, TransportType, ControlTransfer, Direction};
 pub use direct_usb_transport::DirectUsbTransport;
 pub use gen4_fcp::{FcpProtocol, FcpOpcode};
+pub use firmware::{FirmwareFile, FirmwareHeader};
 
 use scarlett_core::{Error, Result};
 
