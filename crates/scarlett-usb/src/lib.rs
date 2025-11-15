@@ -15,6 +15,7 @@ pub use detection::{DeviceDetector, HotplugEvent};
 pub use device_impl::UsbDevice;
 pub use transport::{UsbTransport, TransportType, ControlTransfer, Direction};
 pub use direct_usb_transport::DirectUsbTransport;
+pub use gen4_fcp::{FcpProtocol, FcpOpcode};
 
 use scarlett_core::{Error, Result};
 
