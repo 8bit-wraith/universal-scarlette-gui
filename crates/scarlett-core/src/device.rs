@@ -236,6 +236,8 @@ impl fmt::Display for DeviceModel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceInfo {
     pub model: DeviceModel,
+    pub vendor_id: u16,
+    pub product_id: u16,
     pub serial_number: String,
     pub firmware_version: Option<String>,
     pub usb_path: String,
@@ -243,8 +245,12 @@ pub struct DeviceInfo {
 
 impl DeviceInfo {
     pub fn new(model: DeviceModel, serial_number: String, usb_path: String) -> Self {
+        let vendor_id = 0x1235; // Focusrite USB Vendor ID
+        let product_id = model.product_id();
         Self {
             model,
+            vendor_id,
+            product_id,
             serial_number,
             firmware_version: None,
             usb_path,
