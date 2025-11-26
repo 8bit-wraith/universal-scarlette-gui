@@ -7,3 +7,21 @@ alsa-scarlett-gui-resources.c
 vu.b4.alsa-scarlett-gui.desktop
 .flatpak-builder/
 flatpak-build/
+
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Slint generated files
+.slint-cache/

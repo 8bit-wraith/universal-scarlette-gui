@@ -1,0 +1,21 @@
+[package]
+name = "scarlett-usb"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+scarlett-core = { path = "../scarlett-core" }
+nusb = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = "0.3"
+serde = { workspace = true }
+futures = "0.3"
+sha2 = "0.10"
+
+[dev-dependencies]
+tracing-subscriber = "0.3"

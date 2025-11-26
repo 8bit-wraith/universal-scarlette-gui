@@ -1,0 +1,218 @@
+// Main Scarlett GUI Application UI
+
+import { Button, VerticalBox, HorizontalBox, ListView, ScrollView } from "std-widgets.slint";
+
+// Color palette matching Focusrite branding - Extra Dark Theme
+export global ColorPalette {
+    // Focusrite Red
+    in-out property <color> primary: #E2231A;
+    in-out property <color> primary-hover: #FF3B2F;
+    in-out property <color> primary-dim: #B01812;
+
+    // Extra dark theme colors (professional audio app style)
+    in-out property <color> background: #0D0D0D;
+    in-out property <color> surface: #1A1A1A;
+    in-out property <color> surface-light: #252525;
+    in-out property <color> surface-lighter: #303030;
+
+    // Text colors with better contrast
+    in-out property <color> text-primary: #EEEEEE;
+    in-out property <color> text-secondary: #999999;
+    in-out property <color> text-disabled: #555555;
+
+    // Accent colors
+    in-out property <color> border: #333333;
+    in-out property <color> success: #4CAF50;
+}
+
+// Device info struct
+export struct DeviceItem {
+    name: string,
+    serial: string,
+    status: string,
+}
+
+// Main application window
+export component MainWindow inherits Window {
+    title: "Scarlett Control";
+    preferred-width: 800px;
+    preferred-height: 600px;
+    background: ColorPalette.background;
+
+    // Callbacks
+    callback scan-devices();
+    callback select-device(int);
+    callback open-routing();
+    callback open-mixer();
+    callback open-levels();
+
+    // Properties
+    in-out property <[DeviceItem]> devices: [];
+    in-out property <string> status-text: "No devices found";
+
+    VerticalBox {
+        padding: 20px;
+        spacing: 20px;
+
+        // Header
+        HorizontalBox {
+            alignment: start;
+
+            Text {
+                text: "Scarlett Control Panel";
+                font-size: 24px;
+                font-weight: 700;
+                color: ColorPalette.text-primary;
+            }
+        }
+
+        // Device list section
+        VerticalBox {
+            spacing: 10px;
+
+            HorizontalBox {
+                Text {
+                    text: "Connected Devices";
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: ColorPalette.text-primary;
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                Button {
+                    text: "Scan for Devices";
+                    clicked => { root.scan-devices(); }
+                }
+            }
+
+            // Device list
+            Rectangle {
+                height: 200px;
+                background: ColorPalette.surface;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: ColorPalette.border;
+
+                if devices.length == 0: VerticalBox {
+                    alignment: center;
+                    spacing: 8px;
+
+                    Text {
+                        text: status-text;
+                        font-size: 14px;
+                        color: ColorPalette.text-secondary;
+                        horizontal-alignment: center;
+                    }
+
+                    Text {
+                        text: "Click 'Scan for Devices' or connect a Focusrite device";
+                        font-size: 11px;
+                        color: ColorPalette.text-disabled;
+                        horizontal-alignment: center;
+                    }
+                }
+
+                if devices.length > 0: ScrollView {
+                    ListView {
+                        for device[index] in devices: Rectangle {
+                            height: 60px;
+                            background: touch-area.has-hover ? ColorPalette.surface-light : transparent;
+                            border-radius: 4px;
+
+                            touch-area := TouchArea {
+                                clicked => { root.select-device(index); }
+                            }
+
+                            HorizontalBox {
+                                padding: 12px;
+                                spacing: 12px;
+
+                                VerticalBox {
+                                    alignment: start;
+                                    spacing: 4px;
+
+                                    Text {
+                                        text: device.name;
+                                        font-size: 16px;
+                                        font-weight: 600;
+                                        color: ColorPalette.text-primary;
+                                    }
+
+                                    Text {
+                                        text: "Serial: " + device.serial;
+                                        font-size: 12px;
+                                        color: ColorPalette.text-secondary;
+                                    }
+                                }
+
+                                Rectangle { horizontal-stretch: 1; }
+
+                                Text {
+                                    text: device.status;
+                                    font-size: 14px;
+                                    color: ColorPalette.primary;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Control buttons
+        HorizontalBox {
+            spacing: 12px;
+            alignment: start;
+
+            Button {
+                text: "Routing";
+                enabled: devices.length > 0;
+                clicked => { root.open-routing(); }
+            }
+
+            Button {
+                text: "Mixer";
+                enabled: devices.length > 0;
+                clicked => { root.open-mixer(); }
+            }
+
+            Button {
+                text: "Levels";
+                enabled: devices.length > 0;
+                clicked => { root.open-levels(); }
+            }
+        }
+
+        // Status bar
+        Rectangle {
+            height: 30px;
+            background: ColorPalette.surface;
+            border-radius: 4px;
+            border-width: 1px;
+            border-color: ColorPalette.border;
+
+            HorizontalBox {
+                padding: 8px;
+                spacing: 12px;
+
+                Text {
+                    text: devices.length == 0 ? "● No devices connected" : "● " + devices.length + " device(s) connected";
+                    font-size: 11px;
+                    color: devices.length > 0 ? ColorPalette.success : ColorPalette.text-disabled;
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                Text {
+                    text: "Rust + Slint UI";
+                    font-size: 10px;
+                    color: ColorPalette.text-disabled;
+                }
+            }
+        }
+
+        Rectangle { vertical-stretch: 1; }
+    }
+}
